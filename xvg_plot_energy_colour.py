@@ -95,23 +95,25 @@ except:
 # sanity check
 #=======================================================================
 
-if len(args.particles_xvgfilenames) != len(args.charges_xvgfilenames):
-	print "Error: different number of particles files (" + str(len(args.particles_xvgfilenames)) + ") and charges files (" + str(len(args.charges_xvgfilenames)) + ")."
+if not os.path.isfile(args.energy_xvgfilename):
+	print "Error: file " + str(args.energy_xvgfilename) + " not found."
 	sys.exit(1)
-	
-for f in args.particles_xvgfilenames + args.charges_xvgfilenames:
-	if not os.path.isfile(f):
-		print "Error: file " + str(f) + " not found."
-		sys.exit(1)
+
+if not os.path.isfile(args.status_xvgfilename):
+	print "Error: file " + str(args.status_xvgfilename) + " not found."
+	sys.exit(1)
 
 ##########################################################################################
 # FUNCTIONS DEFINITIONS
 ##########################################################################################
 
-labels = ['AM Cter outwards','AM Nter outwards','SMa']
-#labels = ['r_1','r_2','r_3','r_1','r_2','r_3']
+#  - 0: surfacic
+#  - 1: TM
+#  - 2: TM*
+#  - 3: U-shape
+
+labels = ['interfacial','TM','TM*','U-shape']
 colours = ['#579D1C','#579D1C','#579D1C','#7E0021','#7E0021','#7E0021']
-#colours = ['#1D91C0','#579D1C','#7E0021']		#cyan, green, dark red
 
 #=========================================================================================
 # data loading
