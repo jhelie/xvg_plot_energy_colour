@@ -12,27 +12,27 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.1.0"
-parser = argparse.ArgumentParser(prog = 'xvg_plot_density_particle_vs_charge', usage='', add_help = False, formatter_class = argparse.RawDescriptionHelpFormatter, description =\
+version_nb = "0.0.1"
+parser = argparse.ArgumentParser(prog = 'xvg_plot_energy_colour', usage='', add_help = False, formatter_class = argparse.RawDescriptionHelpFormatter, description =\
 '''
-**********************************************
+*****************************************************
 v''' + version_nb + '''
 author: Jean Helie (jean.helie@bioch.ox.ac.uk)
-**********************************************
+git: https://github.com/jhelie/xvg_plot_energy_colour
+*****************************************************
 
-The file should be (IN THIS ORDER!):
+[ DESCRIPTION ]
 
--> all particles density files via -p 
--> all charges files (in the same order as the density files) via -c
+This script plots the evolution of the potential energy and colours it
+based on the conformation status of that peptide
 
 [ USAGE ]
 
 Option	      Default  	Description                    
 -----------------------------------------------------
--p			: xvg file(s) for particle density
--c			: xvg file(s) for charge density
--o	pops_vs_charge	: name of outptut file
---density		: to plot densities instead of free energies
+-e			: xvg file for energy evolution
+-c			: xvg file(s) for conformation status
+-o	epot_vs_status	: name of outptut file
 --comments	@,#	: lines starting with these characters will be considered as comment
 
 Other options
@@ -43,10 +43,9 @@ Other options
 ''')
 
 #options
-parser.add_argument('-p', nargs='+', dest='particles_xvgfilenames', help=argparse.SUPPRESS, required=True)
-parser.add_argument('-c', nargs='+', dest='charges_xvgfilenames', help=argparse.SUPPRESS, required=True)
-parser.add_argument('-o', nargs=1, dest='output_file', default=["pops_vs_charge"], help=argparse.SUPPRESS)
-parser.add_argument('--density', dest='density', action='store_true', help=argparse.SUPPRESS)
+parser.add_argument('-e', nargs=1, dest='energy_xvgfilename', help=argparse.SUPPRESS, required=True)
+parser.add_argument('-c', nargs=1, dest='status_xvgfilename', help=argparse.SUPPRESS, required=True)
+parser.add_argument('-o', nargs=1, dest='output_file', default=["epot_vs_status"], help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
 #other options
@@ -58,6 +57,8 @@ parser.add_argument('-h','--help', action='help', help=argparse.SUPPRESS)
 #=========================================================================================
 
 args = parser.parse_args()
+args.energy_xvgfilename = args.energy_xvgfilename[0]
+args.status_xvgfilename = args.status_xvgfilename[0]
 args.output_file = args.output_file[0]
 args.comments = args.comments[0].split(',')
 
