@@ -26,6 +26,12 @@ git: https://github.com/jhelie/xvg_plot_energy_colour
 This script plots the evolution of the potential energy and colours it
 based on the conformation status of that peptide
 
+The energy file can contain 2 or 3 columns (in the latter case the last column is
+interpreted as a standard deviation) and the conformation status file can contain any
+number of columns but only the first 2 will be considered.
+
+The first column (correspondig to time) must be exactly the same in each file
+
 [ USAGE ]
 
 Option	      Default  	Description                    
@@ -120,7 +126,9 @@ def load_xvg():															#DONE
 	global y_min
 	global y_max
 	global times
-	global data_energy
+	global data_energy_avg
+	global data_energy_max
+	global data_energy_min
 	global data_status
 	
 	#energy
@@ -140,10 +148,11 @@ def load_xvg():															#DONE
 		
 	#get data
 	tmp_data = np.loadtxt(filename, skiprows = tmp_nb_rows_to_skip)
+	tmp_data = tmp_data[1:,:]		#remove first line
 	nb_rows = np.shape(tmp_data)[0]
 	nb_cols = np.shape(tmp_data)[1]
-	if nb_cols > 2:
-		print "Error: more than 2 columns detected in file " + str(filename)
+	if nb_cols > 3:
+		print "Error: more than 3 columns detected in file " + str(filename)
 		sys.exit(1)
 	
 	#store time
@@ -151,8 +160,13 @@ def load_xvg():															#DONE
 	times[:,0] = tmp_data[:,0]/float(1000)
 
 	#store energy
-	data_energy = np.zeros((nb_rows,1))
-	data_energy[:,0] = tmp_data[:,1]
+	data_energy_avg = np.zeros((nb_rows,1))
+	data_energy_avg[:,0] = tmp_data[:,1]
+	if nb_cols > 2:
+		data_energy_max = np.zeros((nb_rows,1))
+		data_energy_min = np.zeros((nb_rows,1))
+		data_energy_max[:,0] = data_energy_avg[:,0] + tmp_data[:,2]
+		data_energy_min[:,0] = data_energy_avg[:,0] - tmp_data[:,2]
 	
 	#status
 	#------
@@ -171,14 +185,12 @@ def load_xvg():															#DONE
 	
 	#get data
 	tmp_data = np.loadtxt(filename, skiprows = tmp_nb_rows_to_skip)
-	nb_rows = np.shape(tmp_data)[0]
-	nb_cols = np.shape(tmp_data)[1]
+	tmp_data = tmp_data[1:,:]		#remove first line
 	if np.shape(tmp_data)[0] != nb_rows:
 		print "Error: file " + str(filename) + " has " + str(np.shape(tmp_data)[0]) + " data rows, whereas file " + str(args.energy_xvgfilename) + " has " + str(nb_rows) + " data rows."
 		sys.exit(1)
-	if nb_cols > 2:
-		print "Error: more than 2 columns detected in file " + str(filename)
-		sys.exit(1)
+	if np.shape(tmp_data)[1] > 2:
+		print "Warning: more than 2 columns detected in file " + str(filename) + ", only the first 2 will be takin into account."
 	if not np.array_equal(tmp_data[:,0],times[:,0]):
 		print "\nError: the first column of file " + str(filename) + " is different than that of " + str(args.energy_xvgfilename) + "."
 		sys.exit(1)
@@ -187,9 +199,24 @@ def load_xvg():															#DONE
 	data_status = np.zeros((nb_rows,1))
 	data_status[:,0] = tmp_data[:,1]
 	
+	#post-processing
+	#---------------
 	#switch to microseconds
 	if args.micro:
 		times[:,0] = times[:,0]/float(1000)
+	
+	#shift data down
+	y_min = 0
+	if nb_cols > 2:
+		tmp_min = np.min(data_energy_min[:,0])
+		data_energy_avg[:,0] -= tmp_min
+		data_energy_max[:,0] -= tmp_min
+		data_energy_min[:,0] -= tmp_min	
+		y_max = 1.1*np.max(data_energy_max[:,0])
+	else:
+		tmp_min = np.min(data_energy_avg[:,0])
+		data_energy_avg[:,0] -= tmp_min
+		y_max = 1.1*np.max(data_energy_avg[:,0])
 	
 	return
 
@@ -216,7 +243,7 @@ def graph_xvg():
 	colours = ['b','y','g','m']
 	cmap = mcolors.ListedColormap(colours)
 	norm = mcolors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], cmap.N)
-	points = np.array([times[:,0],data_energy[:,0]]).T.reshape(-1,1,2)
+	points = np.array([times[:,0],data_energy_avg[:,0]]).T.reshape(-1,1,2)
 	segments = np.concatenate([points[:-1], points[1:]], axis=1)	
 	lc = LineCollection(segments, cmap = cmap, norm = norm)
 	lc.set_array(data_status[:,0])
@@ -231,26 +258,25 @@ def graph_xvg():
 
 	#plot line
 	ax = plt.gca()
-	#ax.add_collection(lc)
-	plt.gca().add_collection(lc)
-		
+	ax.add_collection(lc)
+	plt.fill_between(times[:,0], data_energy_min[:,0], data_energy_max[:,0], color = "#262626", edgecolor = "#262626", linewidth = 0, alpha = 0.2)		
+	
 	if args.micro:
 		plt.xlabel('time (us)')	
 	else:
 		plt.xlabel('time (ns)')
-	plt.ylabel('potential energy (kJ.mol-1)')
+	plt.ylabel('relative potential energy (kJ.mol-1)')
 	
 	#save figure
-	plt.xlim(times[:,0].min(), times[:,0].max())
-	#ax.set_xlim(0, 5000)
-	ax.set_ylim(data_energy[:,0].min(), -91000)
+	ax.set_xlim(times[:,0].min(), times[:,0].max())
+	ax.set_ylim(y_min, y_max)
 	ax.spines['top'].set_visible(False)
 	ax.spines['right'].set_visible(False)
 	ax.xaxis.set_ticks_position('bottom')
 	ax.yaxis.set_ticks_position('left')
 	ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
 	ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
-	ax.xaxis.labelpad = 20
+	#ax.xaxis.labelpad = 20
 	ax.yaxis.labelpad = 20
 	ax.get_xaxis().set_tick_params(direction='out')
 	ax.get_yaxis().set_tick_params(direction='out')
