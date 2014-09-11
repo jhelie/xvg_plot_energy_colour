@@ -42,7 +42,12 @@ Option	      Default  	Description
 --preset		: use pre-set colours for colours (default = use jet scale based on min-max values in -c file)
 --micro			: use microsecond instead of ns for x axis
 --kT			: use kT for energy units (you can pass the temperature as argument, if not default = 323K)
---tmax			: plot x axis until this value (be careful to enter a number consistent with the time unit chosen!)
+--ymax			: upper boundary of energy axis (be careful to enter a number consistent with the energy unit chosen!)
+--ymin			: lower boundary of energy axis (be careful to enter a number consistent with the energy unit chosen!)
+--tmax			: lower boundary of time axis (be careful to enter a number consistent with the time unit chosen!)
+--tmin			: lower boundary of time axis (be careful to enter a number consistent with the time unit chosen!)
+--nbx			: nb ticks on x axis
+--nby			: nb ticks on y axis
 --comments	@,#	: lines starting with these characters will be considered as comment
 
 Other options
@@ -58,7 +63,12 @@ parser.add_argument('-c', nargs=1, dest='status_xvgfilename', help=argparse.SUPP
 parser.add_argument('-o', nargs=1, dest='output_file', default=["epot_vs_status"], help=argparse.SUPPRESS)
 parser.add_argument('--micro', dest='micro', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--kT', nargs='?', dest='kT', const=323, default="no", help=argparse.SUPPRESS)
+parser.add_argument('--ymax', nargs=1, dest='ymax', default=[-1], type=float, help=argparse.SUPPRESS)
+parser.add_argument('--ymin', nargs=1, dest='ymin', default=[-1], type=float, help=argparse.SUPPRESS)
 parser.add_argument('--tmax', nargs=1, dest='tmax', default=[-1], type=float, help=argparse.SUPPRESS)
+parser.add_argument('--tmin', nargs=1, dest='tmin', default=[-1], type=float, help=argparse.SUPPRESS)
+parser.add_argument('--nbx', nargs=1, dest='nbx', default=[6], type=int, help=argparse.SUPPRESS)
+parser.add_argument('--nby', nargs=1, dest='nby', default=[7], type=int, help=argparse.SUPPRESS)
 parser.add_argument('--preset', dest='preset', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
@@ -74,7 +84,12 @@ args = parser.parse_args()
 args.energy_xvgfilename = args.energy_xvgfilename[0]
 args.status_xvgfilename = args.status_xvgfilename[0]
 args.output_file = args.output_file[0]
+args.ymax = args.ymax[0]
+args.ymin = args.ymin[0]
 args.tmax = args.tmax[0]
+args.tmin = args.tmin[0]
+args.nbx = args.nbx[0]
+args.nby = args.nby[0]
 args.comments = args.comments[0].split(',')
 
 if args.kT != "no":
@@ -236,8 +251,10 @@ def load_xvg():															#DONE
 		y_max = np.max(data_energy_max[:,0])
 		y_min = 1.1*np.min(data_energy_min[:,0])
 	
-	#y_min = 850	
-	#y_max = 850
+	if args.ymax != 1:
+		y_max = args.ymax
+	if args.ymin != 1:
+		y_min = args.ymin
 	
 	return
 
@@ -321,17 +338,21 @@ def graph_xvg():
 		plt.ylabel('relative potential energy (kJ.mol-1)')
 	
 	#save figure
+	tmp_tmax = times[:,0].max()
+	tmp_tmin = times[:,0].min()
 	if args.tmax != -1:
-		ax.set_xlim(times[:,0].min(), args.tmax)
-	else:
-		ax.set_xlim(times[:,0].min(), times[:,0].max())
+		tmp_tmax = args.tmax
+	if args.tmin != -1:
+		tmp_tmin = args.tmin
+	
+	ax.set_xlim(tmp_tmin, tmp_tmax)
 	ax.set_ylim(y_min, y_max)
 	ax.spines['top'].set_visible(False)
 	ax.spines['right'].set_visible(False)
 	ax.xaxis.set_ticks_position('bottom')
 	ax.yaxis.set_ticks_position('left')
-	ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
-	ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
+	ax.xaxis.set_major_locator(MaxNLocator(nbins=args.nbx))
+	ax.yaxis.set_major_locator(MaxNLocator(nbins=args.nby))
 	#ax.xaxis.labelpad = 20
 	ax.yaxis.labelpad = 20
 	ax.get_xaxis().set_tick_params(direction='out')
