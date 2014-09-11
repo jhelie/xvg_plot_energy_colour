@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.0.2"
+version_nb = "0.0.3"
 parser = argparse.ArgumentParser(prog = 'xvg_plot_energy_colour', usage='', add_help = False, formatter_class = argparse.RawDescriptionHelpFormatter, description =\
 '''
 *****************************************************
@@ -41,6 +41,8 @@ Option	      Default  	Description
 -o	epot_vs_status	: name of outptut file
 --preset		: use pre-set colours for colours (default = use jet scale based on min-max values in -c file)
 --micro			: use microsecond instead of ns for x axis
+--kT			: use kT for energy units (you can pass the temperature as argument, if not default = 323K)
+--tmax			: plot x axis until this value (be careful to enter a number consistent with the time unit chosen!)
 --comments	@,#	: lines starting with these characters will be considered as comment
 
 Other options
@@ -55,6 +57,8 @@ parser.add_argument('-e', nargs=1, dest='energy_xvgfilename', help=argparse.SUPP
 parser.add_argument('-c', nargs=1, dest='status_xvgfilename', help=argparse.SUPPRESS, required=True)
 parser.add_argument('-o', nargs=1, dest='output_file', default=["epot_vs_status"], help=argparse.SUPPRESS)
 parser.add_argument('--micro', dest='micro', action='store_true', help=argparse.SUPPRESS)
+parser.add_argument('--kT', nargs='?', dest='kT', const=323, default="no", help=argparse.SUPPRESS)
+parser.add_argument('--tmax', nargs=1, dest='tmax', default=[-1], type=float, help=argparse.SUPPRESS)
 parser.add_argument('--preset', dest='preset', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
@@ -70,7 +74,13 @@ args = parser.parse_args()
 args.energy_xvgfilename = args.energy_xvgfilename[0]
 args.status_xvgfilename = args.status_xvgfilename[0]
 args.output_file = args.output_file[0]
+args.tmax = args.tmax[0]
 args.comments = args.comments[0].split(',')
+
+if args.kT != "no":
+	kT_temp = float(args.kT)
+	global kT_factor
+	kT_factor = kT_temp * 1.3806488 * 6.0221412 / float(1000)
 
 #=========================================================================================
 # import modules (doing it now otherwise might crash before we can display the help menu!)
@@ -193,7 +203,7 @@ def load_xvg():															#DONE
 		print "Error: file " + str(filename) + " has " + str(np.shape(tmp_data)[0]) + " data rows, whereas file " + str(args.energy_xvgfilename) + " has " + str(nb_rows) + " data rows."
 		sys.exit(1)
 	if np.shape(tmp_data)[1] > 2:
-		print "Warning: more than 2 columns detected in file " + str(filename) + ", only the first 2 will be takin into account."
+		print "Warning: more than 2 columns detected in file " + str(filename) + ", only the first 2 will be taken into account."
 	if not np.array_equal(tmp_data[:,0],times[:,0]):
 		print "\nError: the first column of file " + str(filename) + " is different than that of " + str(args.energy_xvgfilename) + "."
 		sys.exit(1)
@@ -204,25 +214,29 @@ def load_xvg():															#DONE
 	
 	#post-processing
 	#---------------
+	#switch to kT
+	if args.kT != "no":
+		data_energy_avg[:,0] /= float(kT_factor)
+		if nb_cols > 2:
+			data_energy_max[:,0] /= float(kT_factor)
+			data_energy_min[:,0] /= float(kT_factor)
+	
 	#switch to microseconds
 	if args.micro:
 		times[:,0] = times[:,0]/float(1000)
 	
 	#shift data down
-	y_min = 0
+	tmp_max = np.max(data_energy_avg[:,0])
+	data_energy_avg[:,0] -= tmp_max
+	y_max = 0
+	y_min = 0.9*np.min(data_energy_avg[:,0])
 	if nb_cols > 2:
-		tmp_min = np.min(data_energy_min[:,0])
-		data_energy_avg[:,0] -= tmp_min
-		data_energy_max[:,0] -= tmp_min
-		data_energy_min[:,0] -= tmp_min	
-		y_max = 1.1*np.max(data_energy_max[:,0])
-		y_min = 0.9*np.min(data_energy_min[:,0])
-	else:
-		tmp_min = np.min(data_energy_avg[:,0])
-		data_energy_avg[:,0] -= tmp_min
-		y_max = 1.1*np.max(data_energy_avg[:,0])
-		y_min = 0.9*np.min(data_energy_avg[:,0])
+		data_energy_max[:,0] -= tmp_max
+		data_energy_min[:,0] -= tmp_max	
+		y_max = np.max(data_energy_max[:,0])
+		y_min = 1.1*np.min(data_energy_min[:,0])
 	
+	#y_min = 850	
 	#y_max = 850
 	
 	return
@@ -296,14 +310,21 @@ def graph_xvg():
 	if nb_cols > 2:
 		plt.fill_between(times[:,0], data_energy_min[:,0], data_energy_max[:,0], color = "#262626", edgecolor = "#262626", linewidth = 0, alpha = 0.2)		
 	
+	#axis labels
 	if args.micro:
 		plt.xlabel('time (us)')	
 	else:
 		plt.xlabel('time (ns)')
-	plt.ylabel('relative potential energy (kJ.mol-1)')
+	if args.kT != "no":
+		plt.ylabel('relative potential energy (kT at T = ' + str(kT_temp) + ' K)')
+	else:
+		plt.ylabel('relative potential energy (kJ.mol-1)')
 	
 	#save figure
-	ax.set_xlim(times[:,0].min(), times[:,0].max())
+	if args.tmax != -1:
+		ax.set_xlim(times[:,0].min(), args.tmax)
+	else:
+		ax.set_xlim(times[:,0].min(), times[:,0].max())
 	ax.set_ylim(y_min, y_max)
 	ax.spines['top'].set_visible(False)
 	ax.spines['right'].set_visible(False)
