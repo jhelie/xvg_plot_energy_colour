@@ -12,7 +12,7 @@ import os.path
 #=========================================================================================
 # create parser
 #=========================================================================================
-version_nb = "0.0.1"
+version_nb = "0.0.2"
 parser = argparse.ArgumentParser(prog = 'xvg_plot_energy_colour', usage='', add_help = False, formatter_class = argparse.RawDescriptionHelpFormatter, description =\
 '''
 *****************************************************
@@ -39,6 +39,7 @@ Option	      Default  	Description
 -e			: xvg file for energy evolution
 -c			: xvg file(s) for conformation status
 -o	epot_vs_status	: name of outptut file
+--preset		: use pre-set colours for colours (default = use jet scale based on min-max values in -c file)
 --micro			: use microsecond instead of ns for x axis
 --comments	@,#	: lines starting with these characters will be considered as comment
 
@@ -54,6 +55,7 @@ parser.add_argument('-e', nargs=1, dest='energy_xvgfilename', help=argparse.SUPP
 parser.add_argument('-c', nargs=1, dest='status_xvgfilename', help=argparse.SUPPRESS, required=True)
 parser.add_argument('-o', nargs=1, dest='output_file', default=["epot_vs_status"], help=argparse.SUPPRESS)
 parser.add_argument('--micro', dest='micro', action='store_true', help=argparse.SUPPRESS)
+parser.add_argument('--preset', dest='preset', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
 #other options
@@ -130,6 +132,7 @@ def load_xvg():															#DONE
 	global data_energy_max
 	global data_energy_min
 	global data_status
+	global nb_cols
 	
 	#energy
 	#------
@@ -213,10 +216,14 @@ def load_xvg():															#DONE
 		data_energy_max[:,0] -= tmp_min
 		data_energy_min[:,0] -= tmp_min	
 		y_max = 1.1*np.max(data_energy_max[:,0])
+		y_min = 0.9*np.min(data_energy_min[:,0])
 	else:
 		tmp_min = np.min(data_energy_avg[:,0])
 		data_energy_avg[:,0] -= tmp_min
 		y_max = 1.1*np.max(data_energy_avg[:,0])
+		y_min = 0.9*np.min(data_energy_avg[:,0])
+	
+	#y_max = 850
 	
 	return
 
@@ -225,24 +232,51 @@ def load_xvg():															#DONE
 #=========================================================================================
 
 
-# Create a colormap for red, green and blue and a norm to color
-# f' < -0.5 red, f' > 0.5 blue, and the rest green
-
-#  - 0: surfacic
-#  - 1: TM
-#  - 2: TM*
-#  - 3: U-shape
-
 def graph_xvg():
 	
 	print " -plotting data..."
 	
 	#create line collections
-	status = [0,1,2,3]
-	labels = ['interfacial','TM','TM*','U-shape']
-	colours = ['b','y','g','m']
-	cmap = mcolors.ListedColormap(colours)
-	norm = mcolors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], cmap.N)
+	if args.preset:
+		# Create a colormap for red, green and blue and a norm to color
+		# f' < -0.5 red, f' > 0.5 blue, and the rest green
+		
+		#  - 0: surfacic
+		#  - 1: TM
+		#  - 2: TM*
+		#  - 3: U-shape
+
+		status = [0,1,2,3]
+		labels = ['interfacial','TM','TM*','U-shape']
+		colours = ['b','y','g','m']
+		cmap = mcolors.ListedColormap(colours)
+		norm = mcolors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], cmap.N)
+	else:
+
+		#min / max
+		#status_min = int(np.min(data_status[:,0]))
+		#status_max = int(np.max(data_status[:,0]))
+		status_min = 1
+		status_max = 9
+		
+		#labels
+		labels = []
+		for c_size in range(status_min, status_max+1):
+			labels.append(str(c_size))
+
+		#boundaries (assumes everyone is > 0)
+		tmp_boundaries = np.arange(status_min-1, status_max+1)
+		tmp_boundaries = tmp_boundaries + 0.5
+		
+		#colours
+		colours = []
+		tmp_cmap = cm.get_cmap('jet')
+		colours_sizes_value = tmp_cmap(np.linspace(0, status_min, status_max-status_min+1))
+		for c_index in range(0, status_max-status_min+1):
+			colours.append(colours_sizes_value[c_index])
+		cmap = mcolors.ListedColormap(colours)
+		norm = mcolors.BoundaryNorm(tmp_boundaries, cmap.N)
+		
 	points = np.array([times[:,0],data_energy_avg[:,0]]).T.reshape(-1,1,2)
 	segments = np.concatenate([points[:-1], points[1:]], axis=1)	
 	lc = LineCollection(segments, cmap = cmap, norm = norm)
@@ -259,7 +293,8 @@ def graph_xvg():
 	#plot line
 	ax = plt.gca()
 	ax.add_collection(lc)
-	plt.fill_between(times[:,0], data_energy_min[:,0], data_energy_max[:,0], color = "#262626", edgecolor = "#262626", linewidth = 0, alpha = 0.2)		
+	if nb_cols > 2:
+		plt.fill_between(times[:,0], data_energy_min[:,0], data_energy_max[:,0], color = "#262626", edgecolor = "#262626", linewidth = 0, alpha = 0.2)		
 	
 	if args.micro:
 		plt.xlabel('time (us)')	
