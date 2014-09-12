@@ -370,7 +370,7 @@ def graph_xvg():
 
 	#save fig
 	if args.prod:
-		fig.savefig(filename_png, transparent = True)
+		fig.savefig(filename_png, transparent = True, dpi = 500)
 	else:
 		fig.savefig(filename_svg, transparent = True)
 	plt.close()
@@ -387,6 +387,9 @@ graph_xvg()
 #=========================================================================================
 # exit
 #=========================================================================================
-print "\nFinished successfully! Check result in file '" + str(args.output_file) + ".svg'."
+if args.prod:
+	print "\nFinished successfully! Check result in file '" + str(args.output_file) + ".png'."
+else:
+	print "\nFinished successfully! Check result in file '" + str(args.output_file) + ".svg'."
 print ""
 sys.exit(0)
