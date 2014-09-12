@@ -37,7 +37,7 @@ The first column (correspondig to time) must be exactly the same in each file
 Option	      Default  	Description                    
 -----------------------------------------------------
 -e			: xvg file for energy evolution
--c			: xvg file with colouring info
+-c			: xvg file with colouring info (if not specified, constant size of "1" assumed)
 -r			: xvg file for reference (no std dev plotted)
 -o	epot_vs_status	: name of outptut file
 --preset		: use pre-set colours for colours (default = use jet scale based on min-max values in -c file)
@@ -51,6 +51,7 @@ Option	      Default  	Description
 --nby			: nb ticks on y axis
 --prod			: produce a png image of just the plot without any whitespace (no axis, ticks, labels,...)
 --line			: plot a dashed line at Epot = 0
+--thick			: use 4 instead of 3 for line thickness
 --comments	@,#	: lines starting with these characters will be considered as comment
 
 Other options
@@ -62,7 +63,7 @@ Other options
 
 #options
 parser.add_argument('-e', nargs=1, dest='energy_xvgfilename', help=argparse.SUPPRESS, required=True)
-parser.add_argument('-c', nargs=1, dest='status_xvgfilename', help=argparse.SUPPRESS, required=True)
+parser.add_argument('-c', nargs=1, dest='status_xvgfilename', default = ["no"], help=argparse.SUPPRESS)
 parser.add_argument('-r', nargs=1, dest='ref_xvgfilename', default = ["no"], help=argparse.SUPPRESS)
 parser.add_argument('-o', nargs=1, dest='output_file', default=["epot_vs_status"], help=argparse.SUPPRESS)
 parser.add_argument('--micro', dest='micro', action='store_true', help=argparse.SUPPRESS)
@@ -76,6 +77,7 @@ parser.add_argument('--nby', nargs=1, dest='nby', default=[7], type=int, help=ar
 parser.add_argument('--preset', dest='preset', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--prod', dest='prod', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--line', dest='line', action='store_true', help=argparse.SUPPRESS)
+parser.add_argument('--thick', dest='thick', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
 #other options
@@ -143,7 +145,7 @@ if not os.path.isfile(args.energy_xvgfilename):
 	print "Error: file " + str(args.energy_xvgfilename) + " not found."
 	sys.exit(1)
 
-if not os.path.isfile(args.status_xvgfilename):
+if args.status_xvgfilename != "no" and not os.path.isfile(args.status_xvgfilename):
 	print "Error: file " + str(args.status_xvgfilename) + " not found."
 	sys.exit(1)
 
@@ -237,35 +239,38 @@ def load_xvg():															#DONE
 
 	#status
 	#------
-	#get file content
-	print " -reading conformation status file..."
-	filename = args.status_xvgfilename
-	with open(filename) as f:
-		lines = f.readlines()
-	
-	#determine legends and nb of lines to skip
-	tmp_nb_rows_to_skip = 0
-	for l_index in range(0,len(lines)):
-		line = lines[l_index]
-		if line[0] in args.comments:
-			tmp_nb_rows_to_skip += 1
-	
-	#get data
-	tmp_data = np.loadtxt(filename, skiprows = tmp_nb_rows_to_skip)
-	tmp_data = tmp_data[1:,:]		#remove first line
-	if np.shape(tmp_data)[0] != nb_rows:
-		print "Error: file " + str(filename) + " has " + str(np.shape(tmp_data)[0]) + " data rows, whereas file " + str(args.energy_xvgfilename) + " has " + str(nb_rows) + " data rows."
-		sys.exit(1)
-	if np.shape(tmp_data)[1] > 2:
-		print "Warning: more than 2 columns detected in file " + str(filename) + ", only the first 2 will be taken into account."
+	if args.status_xvgfilename != "no":
+		#get file content
+		print " -reading conformation status file..."
+		filename = args.status_xvgfilename
+		with open(filename) as f:
+			lines = f.readlines()
 		
-	if not np.array_equal(tmp_data[:,0],times[:,0]):
-		print "\nError: the first column of file " + str(filename) + " is different than that of " + str(args.energy_xvgfilename) + "."
-		sys.exit(1)
-	
-	#store data
-	data_status = np.zeros((nb_rows,1))
-	data_status[:,0] = tmp_data[:,1]
+		#determine legends and nb of lines to skip
+		tmp_nb_rows_to_skip = 0
+		for l_index in range(0,len(lines)):
+			line = lines[l_index]
+			if line[0] in args.comments:
+				tmp_nb_rows_to_skip += 1
+		
+		#get data
+		tmp_data = np.loadtxt(filename, skiprows = tmp_nb_rows_to_skip)
+		tmp_data = tmp_data[1:,:]		#remove first line
+		if np.shape(tmp_data)[0] != nb_rows:
+			print "Error: file " + str(filename) + " has " + str(np.shape(tmp_data)[0]) + " data rows, whereas file " + str(args.energy_xvgfilename) + " has " + str(nb_rows) + " data rows."
+			sys.exit(1)
+		if np.shape(tmp_data)[1] > 2:
+			print "Warning: more than 2 columns detected in file " + str(filename) + ", only the first 2 will be taken into account."
+			
+		if not np.array_equal(tmp_data[:,0],times[:,0]):
+			print "\nError: the first column of file " + str(filename) + " is different than that of " + str(args.energy_xvgfilename) + "."
+			sys.exit(1)
+		
+		#store data
+		data_status = np.zeros((nb_rows,1))
+		data_status[:,0] = tmp_data[:,1]
+	else:
+		data_status = np.ones((nb_rows,1))	
 	
 	#post-processing
 	#---------------
@@ -353,12 +358,15 @@ def graph_xvg():
 			colours.append(colours_sizes_value[c_index])
 		cmap = mcolors.ListedColormap(colours)
 		norm = mcolors.BoundaryNorm(tmp_boundaries, cmap.N)
-		
+			
 	points = np.array([times[:,0],data_energy_avg[:,0]]).T.reshape(-1,1,2)
 	segments = np.concatenate([points[:-1], points[1:]], axis=1)	
 	lc = LineCollection(segments, cmap = cmap, norm = norm)
 	lc.set_array(data_status[:,0])
-	lc.set_linewidth(3)
+	if args.thick:
+		lc.set_linewidth(4)
+	else:
+		lc.set_linewidth(3)
 		
 	#open files
 	filename_svg = os.getcwd() + '/' + str(args.output_file) + '.svg'
