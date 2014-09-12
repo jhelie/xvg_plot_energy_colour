@@ -48,6 +48,7 @@ Option	      Default  	Description
 --tmin			: lower boundary of time axis (be careful to enter a number consistent with the time unit chosen!)
 --nbx			: nb ticks on x axis
 --nby			: nb ticks on y axis
+--prod			: produce a png image of just the plot without any whitespace (no axis, ticks, labels,...)
 --comments	@,#	: lines starting with these characters will be considered as comment
 
 Other options
@@ -70,6 +71,7 @@ parser.add_argument('--tmin', nargs=1, dest='tmin', default=[-1], type=float, he
 parser.add_argument('--nbx', nargs=1, dest='nbx', default=[6], type=int, help=argparse.SUPPRESS)
 parser.add_argument('--nby', nargs=1, dest='nby', default=[7], type=int, help=argparse.SUPPRESS)
 parser.add_argument('--preset', dest='preset', action='store_true', help=argparse.SUPPRESS)
+parser.add_argument('--prod', dest='prod', action='store_true', help=argparse.SUPPRESS)
 parser.add_argument('--comments', nargs=1, dest='comments', default=['@,#'], help=argparse.SUPPRESS)
 
 #other options
@@ -316,50 +318,61 @@ def graph_xvg():
 	
 	#open files
 	filename_svg = os.getcwd() + '/' + str(args.output_file) + '.svg'
+	filename_png = os.getcwd() + '/' + str(args.output_file) + '.png'
 	
 	#create figure
 	fig = plt.figure(figsize=(8, 6.2))
-	fig.suptitle("System potential energy")
+	if not args.prod:
+		fig.suptitle("System potential energy")
 
 	#plot line
 	ax = plt.gca()
 	ax.add_collection(lc)
 	if nb_cols > 2:
 		plt.fill_between(times[:,0], data_energy_min[:,0], data_energy_max[:,0], color = "#262626", edgecolor = "#262626", linewidth = 0, alpha = 0.2)		
-	
-	#axis labels
-	if args.micro:
-		plt.xlabel('time (us)')	
-	else:
-		plt.xlabel('time (ns)')
-	if args.kT != "no":
-		plt.ylabel('relative potential energy (kT at T = ' + str(kT_temp) + ' K)')
-	else:
-		plt.ylabel('relative potential energy (kJ.mol-1)')
-	
-	#save figure
+		
+	#axis boundaries
 	tmp_tmax = times[:,0].max()
 	tmp_tmin = times[:,0].min()
 	if args.tmax != -1:
 		tmp_tmax = args.tmax
 	if args.tmin != -1:
 		tmp_tmin = args.tmin
-	
 	ax.set_xlim(tmp_tmin, tmp_tmax)
 	ax.set_ylim(y_min, y_max)
-	ax.spines['top'].set_visible(False)
-	ax.spines['right'].set_visible(False)
-	ax.xaxis.set_ticks_position('bottom')
-	ax.yaxis.set_ticks_position('left')
-	ax.xaxis.set_major_locator(MaxNLocator(nbins=args.nbx))
-	ax.yaxis.set_major_locator(MaxNLocator(nbins=args.nby))
-	#ax.xaxis.labelpad = 20
-	ax.yaxis.labelpad = 20
-	ax.get_xaxis().set_tick_params(direction='out')
-	ax.get_yaxis().set_tick_params(direction='out')
-	plt.setp(ax.xaxis.get_majorticklabels(), fontsize = "small")
-	plt.setp(ax.yaxis.get_majorticklabels(), fontsize = "small")
-	fig.savefig(filename_svg, transparent = True)
+
+	#axis labeling
+	if args.prod:
+		plt.axis('off')
+		plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+	else:
+		if args.micro:
+			plt.xlabel('time (us)')	
+		else:
+			plt.xlabel('time (ns)')
+		if args.kT != "no":
+			plt.ylabel('relative potential energy (kT at T = ' + str(kT_temp) + ' K)')
+		else:
+			plt.ylabel('relative potential energy (kJ.mol-1)')	
+		ax.spines['top'].set_visible(False)
+		ax.spines['right'].set_visible(False)
+		ax.xaxis.set_ticks_position('bottom')
+		ax.yaxis.set_ticks_position('left')
+		ax.xaxis.set_major_locator(MaxNLocator(nbins=args.nbx))
+		ax.yaxis.set_major_locator(MaxNLocator(nbins=args.nby))
+		#ax.xaxis.labelpad = 20
+		ax.yaxis.labelpad = 20
+		ax.get_xaxis().set_tick_params(direction='out')
+		ax.get_yaxis().set_tick_params(direction='out')
+		plt.setp(ax.xaxis.get_majorticklabels(), fontsize = "small")
+		plt.setp(ax.yaxis.get_majorticklabels(), fontsize = "small")
+
+
+	#save fig
+	if args.prod:
+		fig.savefig(filename_png, transparent = True)
+	else:
+		fig.savefig(filename_svg, transparent = True)
 	plt.close()
 
 	return
